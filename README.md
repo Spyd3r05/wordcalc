@@ -516,24 +516,6 @@ def execute(self):
     # ... existing code
 ```
 
-### Adding Larger Numbers
-
-**1. Update `Parser.py` to include hundreds:**
-```python
-WORD_TO_NUM = {
-    # ... existing mappings
-    'hundred': 100,
-    'thousand': 1000
-}
-```
-
-**2. Update parsing logic to handle compound hundreds:**
-```python
-def parse_number(self):
-    # Add logic for "five hundred twenty three"
-    pass
-```
-
 ### Adding Variables
 
 Create a new `VariableStore` class:
@@ -704,7 +686,7 @@ in the Software without restriction...
 
 - **Issues**: Report bugs via GitHub Issues
 - **Questions**: Open a discussion in GitHub Discussions
-- **Email**: support@wordcalc.example.com (if applicable)
+- **Email**: agnesnzivu05@gmail.com
 
 ---
 
@@ -746,7 +728,7 @@ in the Software without restriction...
 **A**: No, WordCalc only accepts word form. This is by design to demonstrate natural language processing.
 
 ### Q: What happens with large results like 100+?
-**A**: Currently, results ≥100 are returned as digit strings (e.g., "120"). A future version will support word conversion.
+**A**: WordCalc supports numbers 0-9999. Therefore, large results can be handled.
 
 ### Q: Does it support negative numbers as input?
 **A**: Not currently, but negative results are supported (e.g., "subtract ten and twenty" → "negative ten").
@@ -764,4 +746,4 @@ in the Software without restriction...
 ---
 
 *Last Updated: February 2026*
-*Version: 1.0.0*#
+*Version: 1.0.1*#

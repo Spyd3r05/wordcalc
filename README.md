@@ -764,5 +764,4 @@ in the Software without restriction...
 ---
 
 *Last Updated: February 2026*
-*Version: 1.0.0*#   w o r d c a l c  
- 
+*Version: 1.0.0*#

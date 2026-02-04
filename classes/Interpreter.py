@@ -1,8 +1,15 @@
+"""
+Interpreter Module - Enhanced with Hundreds and Thousands Support
+Executes operations and converts results to words (0-9999)
+"""
+
 from classes.WordCalcError import WordCalcError
+
 
 class Interpreter:
     """
     Interpreter - Executes the parsed expression and returns result
+    Now supports number-to-word conversion for 0-9,999
     """
     
     # Number to word mappings (for output)
@@ -37,26 +44,75 @@ class Interpreter:
             raise WordCalcError(f"Unknown operation: {self.operation}")
     
     def number_to_words(self, num):
-        """Convert a number to its word representation"""
+        """
+        Convert a number (0-9999) to its word representation
+        
+        Algorithm:
+        - Handle negative numbers
+        - Break down into: thousands, hundreds, tens, ones
+        - Convert each component and combine
+        """
+        # Handle negative numbers
         if num < 0:
             return f"negative {self.number_to_words(abs(num))}"
         
+        # Handle zero
+        if num == 0:
+            return 'zero'
+        
+        # For numbers beyond our range, return as digits
+        if num > 9999:
+            return str(num)
+        
+        # Build the word representation
+        parts = []
+        
+        # THOUSANDS place (1000-9000)
+        if num >= 1000:
+            thousands_digit = num // 1000
+            parts.append(self.NUM_TO_WORD[thousands_digit])
+            parts.append('thousand')
+            num = num % 1000  # Remove thousands
+        
+        # HUNDREDS place (100-900)
+        if num >= 100:
+            hundreds_digit = num // 100
+            parts.append(self.NUM_TO_WORD[hundreds_digit])
+            parts.append('hundred')
+            num = num % 100  # Remove hundreds
+        
+        # TENS and ONES place (0-99)
+        if num > 0:
+            parts.append(self._convert_below_hundred(num))
+        
+        return ' '.join(parts)
+    
+    def _convert_below_hundred(self, num):
+        """
+        Convert numbers 1-99 to words
+        Helper method for number_to_words
+        
+        Args:
+            num: Integer between 1 and 99
+        
+        Returns:
+            String representation of the number
+        """
+        # Direct lookup for 0-20 and multiples of 10
         if num in self.NUM_TO_WORD:
             return self.NUM_TO_WORD[num]
         
-        # Handle compound numbers (21-99)
+        # Compound numbers (21-99)
         if 20 < num < 100:
-            tens = (num // 10) * 10
-            ones = num % 10
-            if ones == 0:
-                return self.NUM_TO_WORD[tens]
-            else:
-                return f"{self.NUM_TO_WORD[tens]} {self.NUM_TO_WORD[ones]}"
+            tens_place = (num // 10) * 10
+            ones_place = num % 10
+            
+            tens_word = self.NUM_TO_WORD[tens_place]
+            ones_word = self.NUM_TO_WORD[ones_place]
+            
+            return f"{tens_word} {ones_word}"
         
-        # For numbers >= 100, just return as digits (extension)
-        if num >= 100:
-            return str(num)
-        
+        # Shouldn't reach here if num is 1-99
         return str(num)
     
     def interpret(self):

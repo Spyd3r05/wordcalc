@@ -23,10 +23,10 @@ def main():
         "subtract ten and three",
         "multiply two and four",
         "divide twenty and five",
-        "add thirty two and seventeen",
+        "multiply thirty two and seventeen",
         "multiply seven and eight",
         "subtract fifty and twenty five",
-        "divide ninety and nine",
+        "divide ninety and ninety",
         # Edge cases
         "add zero and five",
         "subtract five and five",

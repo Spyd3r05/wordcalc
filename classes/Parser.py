@@ -1,7 +1,6 @@
 """
 Parser Module - Enhanced with Hundreds and Thousands Support
 Validates syntax according to BNF grammar and converts words to numbers (0-9999)
-FIXED: Handles 'and' within numbers (e.g., "one hundred and thirty")
 """
 
 from classes.WordCalcError import WordCalcError
@@ -55,6 +54,14 @@ class Parser:
             return self.tokens[pos]
         return None
     
+    def count_remaining_ands(self):
+        """Count how many 'and' tokens remain from current position"""
+        count = 0
+        for i in range(self.position, len(self.tokens)):
+            if self.tokens[i] == 'and':
+                count += 1
+        return count
+    
     def parse_operation(self):
         """Parse the operation token"""
         token = self.consume_token()
@@ -87,7 +94,7 @@ class Parser:
         
         return base_value
     
-    def parse_number(self):
+    def parse_number(self, is_first_number=True):
         """
         Parse a complete number (0-9999)
         
@@ -98,8 +105,11 @@ class Parser:
         <hundreds> ::= <basic_number> "hundred"
         <basic_number> ::= <digit> | <teen> | <tens> | <compound>
         
-        Note: Handles optional "and" within numbers (e.g., "one hundred and thirty")
-        Uses lookahead to distinguish "and" within a number vs expression separator
+        Note: Handles optional "and" within numbers
+        Uses 'and' counting: if 2+ 'and's remain, one can be used within number
+        
+        Args:
+            is_first_number: True if parsing first operand, False if second
         """
         total = 0
         
@@ -123,7 +133,7 @@ class Parser:
             total = base * 1000
             
             # Check for optional "and" - use helper to determine if it's within number
-            if self.current_token() == 'and' and self._is_and_within_number():
+            if self.current_token() == 'and' and self._is_and_within_number(is_first_number):
                 self.consume_token()
             
             # Try to parse hundreds part
@@ -131,7 +141,7 @@ class Parser:
             total += hundreds_part
             
             # Check for optional "and" again before tens/ones
-            if self.current_token() == 'and' and self._is_and_within_number():
+            if self.current_token() == 'and' and self._is_and_within_number(is_first_number):
                 self.consume_token()
             
             # Try to parse basic number (tens/ones)
@@ -150,7 +160,7 @@ class Parser:
             total = base * 100
             
             # Check for optional "and" - use helper to determine if it's within number
-            if self.current_token() == 'and' and self._is_and_within_number():
+            if self.current_token() == 'and' and self._is_and_within_number(is_first_number):
                 self.consume_token()
             
             # Try to parse basic number (tens/ones)
@@ -168,19 +178,48 @@ class Parser:
         
         return total
     
-    def _is_and_within_number(self):
+    def _is_and_within_number(self, is_first_number=True):
         """
         Helper: Determine if current "and" is within a number or is expression separator
+        
+        KEY LOGIC: Count remaining 'and' tokens
+        - If parsing FIRST number:
+          - Need at least 2 'and's (one for number, one for separator)
+          - If only 1 'and' remains: must be expression separator
+        - If parsing SECOND number:
+          - Any 'and' can be within the number (no separator needed after)
         
         Returns True if "and" should be consumed as part of current number
         Returns False if "and" is the expression separator
         
-        Logic:
-        - If "and" is followed by a number word that forms a complete component
-          (e.g., "and five hundred"), it's the expression separator
-        - If "and" is followed by a basic number without multiplier
-          (e.g., "and thirty"), it's within the current number
+        Args:
+            is_first_number: True if parsing first operand, False if second
         """
+        # Count how many 'and' tokens remain from current position
+        remaining_ands = self.count_remaining_ands()
+        
+        # If parsing SECOND number, we don't need to reserve an 'and' for separator
+        # So any 'and' we encounter can be consumed as part of the number
+        if not is_first_number:
+            # Still check if it looks like a valid internal 'and'
+            next_token = self.peek_token(1)
+            if next_token is None or next_token not in self.WORD_TO_NUM:
+                return False
+            
+            # Check if pattern indicates new number (shouldn't happen in second number)
+            following_token = self.peek_token(2)
+            if following_token in ['hundred', 'thousand']:
+                return False
+            
+            # Otherwise, consume it as part of the number
+            return True
+        
+        # If parsing FIRST number and only 1 'and' remains,
+        # it MUST be the expression separator
+        if remaining_ands <= 1:
+            return False
+        
+        # If 2+ 'and's remain, check if this one should be within the number
         # Look at what comes after "and"
         next_token = self.peek_token(1)
         
@@ -189,7 +228,7 @@ class Parser:
             return False
         
         # Check if the pattern is "and [number] [hundred|thousand]"
-        # This would indicate a NEW number component
+        # This would indicate a NEW number component (even with multiple 'and's)
         following_token = self.peek_token(2)
         
         if following_token in ['hundred', 'thousand']:
@@ -198,10 +237,9 @@ class Parser:
             return False
         
         # Check for compound numbers: "and twenty three" where "twenty" is at peek(1)
-        # and we need to check if "three" at peek(2) could be part of it
         if next_token in ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']:
             # Could be compound, check if followed by single digit
-            if following_token in self.WORD_TO_NUM and self.WORD_TO_NUM[following_token] < 10:
+            if following_token in self.WORD_TO_NUM and self.WORD_TO_NUM.get(following_token, 100) < 10:
                 # It's a compound within our number: "and twenty three"
                 return True
             # Just tens: "and twenty" (not followed by digit)
@@ -211,7 +249,8 @@ class Parser:
                 # "and twenty hundred" would be invalid, but let's be safe
                 return False
         
-        # Default: if it's just a basic number word, it's within our number
+        # Default: if it's just a basic number word and we have 2+ 'and's,
+        # this one is within our number
         # Examples: "and five", "and thirty", "and twelve"
         return True
     
@@ -248,19 +287,28 @@ class Parser:
         """
         Parse the entire expression according to BNF grammar
         
-        FIXED: Now handles "and" that appears within numbers
-        Example: "add one hundred and thirty and twenty"
-        - First number: "one hundred and thirty" → 130
-        - Separator: "and"
-        - Second number: "twenty" → 20
+        FIXED: Now handles "and" ambiguity by counting remaining 'and' tokens
+        
+        Examples:
+        - "add one hundred and thirty and twenty"
+          → 2 'and's: first for number (130), second for separator
+          → Result: 130 + 20
+        
+        - "multiply two thousand five hundred and three"
+          → 1 'and': must be expression separator
+          → Result: 2500 * 3 (not 2503!)
+        
+        - "add fifty and one hundred and five"
+          → 2 'and's: first is separator, second within second number
+          → Result: 50 + 105
         """
         # <expression> ::= <operation> <number> "and" <number>
         
         # Parse operation
         self.parse_operation()
         
-        # Parse first number (may consume internal "and" tokens)
-        self.num1 = self.parse_number()
+        # Parse first number (may consume internal "and" tokens if 2+ exist)
+        self.num1 = self.parse_number(is_first_number=True)
         
         # Now expect "and" as the expression separator
         # This is the "and" between the two operands
@@ -268,8 +316,8 @@ class Parser:
         if and_token != 'and':
             raise WordCalcError(f"Expected 'and' between numbers but got '{and_token}'")
         
-        # Parse second number (may consume internal "and" tokens)
-        self.num2 = self.parse_number()
+        # Parse second number (can consume any "and" tokens within it)
+        self.num2 = self.parse_number(is_first_number=False)
         
         # Check for extra tokens
         if self.position < len(self.tokens):
